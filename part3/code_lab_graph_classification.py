@@ -10,17 +10,15 @@ from sklearn.metrics import accuracy_score
 from torch_geometric.datasets import TUDataset
 from torch_geometric.utils import to_networkx
 
-############## Task 7
-
 
 #load Mutag dataset
 def load_dataset():
 
-    ##################
-    # your code here #
-    ##################
-
+    dataset = TUDataset(root='./data', name='MUTAG')
+    
+    Gs = [to_networkx(data, to_undirected=True) for data in dataset]
     y = [data.y.item() for data in dataset]
+    
     return Gs, y
 
 
@@ -86,8 +84,6 @@ def shortest_path_kernel(Gs_train, Gs_test):
 
 
 
-############## Task 8
-# Compute the graphlet kernel
 def graphlet_kernel(Gs_train, Gs_test, n_samples=200):
     graphlets = [nx.Graph(), nx.Graph(), nx.Graph(), nx.Graph()]
     
@@ -106,18 +102,33 @@ def graphlet_kernel(Gs_train, Gs_test, n_samples=200):
     graphlets[3].add_edge(0,2)
 
     
-    phi_train = np.zeros((len(G_train), 4))
+    phi_train = np.zeros((len(Gs_train), 4))  
     
-    ##################
-    # your code here #
-    ##################
+    for i, G in enumerate(Gs_train):
+        for _ in range(n_samples):
+            if G.number_of_nodes() >= 3:
+                nodes = np.random.choice(list(G.nodes()), size=3, replace=False)  
+                subgraph = G.subgraph(nodes)
+                
+                for j, graphlet in enumerate(graphlets):
+                    if nx.is_isomorphic(subgraph, graphlet):
+                        phi_train[i, j] += 1
+                        break
 
-    phi_test = np.zeros((len(G_test), 4))
+    phi_test = np.zeros((len(Gs_test), 4))  
     
-    ##################
-    # your code here #
-    ##################
 
+    for i, G in enumerate(Gs_test):
+        for _ in range(n_samples):
+            if G.number_of_nodes() >= 3:
+                nodes = np.random.choice(list(G.nodes()), size=3, replace=False)  
+                subgraph = G.subgraph(nodes)
+                
+                for j, graphlet in enumerate(graphlets):
+                    if nx.is_isomorphic(subgraph, graphlet):
+                        phi_test[i, j] += 1
+                        break
+                        
     K_train = np.dot(phi_train, phi_train.T)
     K_test = np.dot(phi_test, phi_train.T)
 
@@ -128,16 +139,32 @@ K_train_sp, K_test_sp = shortest_path_kernel(G_train, G_test)
 
 
 
-############## Task 9
 
-##################
-# your code here #
-##################
+print("Task 9 : Shortest Path Kernel")
+
+clf_sp = SVC(kernel='precomputed')
+clf_sp.fit(K_train_sp, y_train)
+
+y_pred_sp = clf_sp.predict(K_test_sp)
+accuracy_sp = accuracy_score(y_test, y_pred_sp)
+
+print(f"Accuracy with Shortest Path Kernel: {accuracy_sp}")
 
 
 
-############## Task 10
+print("Task 10 : Graphlet Kernel")
 
-##################
-# your code here #
-##################
+K_train_graphlet, K_test_graphlet = graphlet_kernel(G_train, G_test, n_samples=200)
+
+clf_graphlet = SVC(kernel='precomputed')
+clf_graphlet.fit(K_train_graphlet, y_train)
+
+y_pred_graphlet = clf_graphlet.predict(K_test_graphlet)
+accuracy_graphlet = accuracy_score(y_test, y_pred_graphlet)
+
+print(f"Accuracy with Graphlet Kernel: {accuracy_graphlet}")
+
+
+print("Comparison")
+print(f"Shortest Path Kernel: {accuracy_sp}")
+print(f"Graphlet Kernel: {accuracy_graphlet}")
